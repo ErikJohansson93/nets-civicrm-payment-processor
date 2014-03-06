@@ -140,12 +140,10 @@ class org_dfs_payment_NetsIPN extends CRM_Core_Payment_BaseIPN {
     $query = $this->netsQuery($processor);
 
     $transactionId = "";
-    if (isset($_GET['transactionId']))
-    {
+    if (isset($_GET['transactionId'])) {
       $transactionId = $_GET['transactionId'];
     }
-    if (isset($_POST['transactionId']))
-    {
+    if (isset($_POST['transactionId'])) {
       $transactionId = $_POST['transactionId'];
     }
 
