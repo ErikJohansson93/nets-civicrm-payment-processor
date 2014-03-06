@@ -10,7 +10,7 @@
   </maintainer>
   <releaseDate>2014-02-25</releaseDate>
   <version>1.0</version>
-  <downloadUrl>http://github.com/downloads/eileenmcnaughton/nz.co.fuzion.payflowlink/nz.co.fuzion.payflowlink.zip</downloadUrl>
+  <downloadUrl>https://github.com/ErikJohansson93/nets-civicrm-payment-processor/archive/master.zip</downloadUrl>
   <develStage>development</develStage>
   <compatibility>
     <ver>4.4</ver>
