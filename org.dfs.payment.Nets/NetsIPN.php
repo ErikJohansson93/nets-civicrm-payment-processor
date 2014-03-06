@@ -180,7 +180,9 @@ class org_dfs_payment_NetsIPN extends CRM_Core_Payment_BaseIPN {
       return $ProcessResult;
     }
     catch (SoapFault $fault) {
-      CRM_Core_Error::fatal(ts('Error: ' . $fault));
+      drupal_set_message(t('The Payment have been cancelled. If this was unexpected, contact an administrator.'), 'warning');
+      drupal_goto('civicrm/contribute/transact?reset=1&id=8');
+      watchdog('nets_payment_sale', $fault, array(), WATCHDOG_NOTICE, NULL);
     }
   }
 
@@ -218,7 +220,9 @@ class org_dfs_payment_NetsIPN extends CRM_Core_Payment_BaseIPN {
       return $QueryResult;
     }
     catch (SoapFault $fault) {
-      CRM_Core_Error::fatal(ts('Error: ' . $fault));
+      drupal_set_message(t('An unrecognised error has occured. Please contact an administrator.'), 'error');
+      drupal_goto('civicrm/contribute/transact?reset=1&id=8');
+      watchdog('nets_payment_query', $fault, array(), WATCHDOG_ERROR, NULL);
     }
   }
 }

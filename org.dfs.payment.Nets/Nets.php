@@ -230,7 +230,9 @@ class org_dfs_payment_Nets extends CRM_Core_Payment {
       exit();
     }
     catch (SoapFault $fault) {
-      CRM_Core_Error::fatal(ts('Error: ' . $fault));
+      drupal_set_message(t('An unrecognised error has occured. Please contact an administrator.'), 'error');
+      drupal_goto('civicrm/contribute/transact?reset=1&id=8');
+      watchdog('nets_payment_do_transfer', $fault, array(), WATCHDOG_ERROR, NULL);
     }
   }
 
