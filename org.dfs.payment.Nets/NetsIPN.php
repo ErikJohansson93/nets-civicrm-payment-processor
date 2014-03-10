@@ -83,6 +83,9 @@ class org_dfs_payment_NetsIPN extends CRM_Core_Payment_BaseIPN {
     // Complete the transaction.
     $this->completeTransaction($input, $ids, $objects, $transaction, $recur);
 
+    // Activate the user in drupal.
+    $this->activeDrupalUser($ids['contact']);
+
     CRM_Utils_System::redirect($finalURL);
   }
 
@@ -223,6 +226,29 @@ class org_dfs_payment_NetsIPN extends CRM_Core_Payment_BaseIPN {
       drupal_set_message(t('An unrecognised error has occured. Please contact an administrator.'), 'error');
       drupal_goto('civicrm/contribute/transact?reset=1&id=8');
       watchdog('nets_payment_query', $fault, array(), WATCHDOG_ERROR, NULL);
+    }
+  }
+
+  /**
+   * Activate a drupal user.
+   *
+   * @public
+   */
+  function activeDrupalUser($cid) {
+    if (is_numeric($cid)) {
+      // Get the user uid from contact id.
+      $uid = db_query('SELECT uf_id FROM {civicrm_uf_match} WHERE contact_id = :cid', array(':cid' => $cid))->fetchField();
+
+      if (is_numeric($uid)) {
+        // Load the user.
+        $user = user_load($uid);
+
+        // Activate the user in drupal.
+        $user->status = 1;
+
+        // Save the user.
+        user_save($user);
+      }
     }
   }
 }
