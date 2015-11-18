@@ -103,7 +103,7 @@ class org_dfs_payment_Nets extends CRM_Core_Payment {
     $response = civicrm_api3('PaymentProcessor', 'get', array(
       'sequential' => 1,
       'is_test' => $is_test,
-      'name' => "Nets",
+      'name' => $this->_paymentProcessor['name'],
     ));
 
     // Add relevant payment processor information.
