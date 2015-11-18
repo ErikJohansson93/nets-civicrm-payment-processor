@@ -13,7 +13,7 @@
   <downloadUrl>https://github.com/ErikJohansson93/nets-civicrm-payment-processor/archive/master.zip</downloadUrl>
   <develStage>development</develStage>
   <compatibility>
-    <ver>4.4</ver>
+    <ver>4.6.9</ver>
   </compatibility>
   <comments></comments>
   <typeInfo>
