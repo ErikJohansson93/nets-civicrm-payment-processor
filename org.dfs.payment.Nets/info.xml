@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<extension key="org.dfs.payment.ogone" type="payment">
+<extension key="org.dfs.payment.Nets" type="payment">
   <file>Nets</file>
   <name>Nets</name>
   <description>Nets credit card payment</description>
@@ -21,11 +21,11 @@
     <passwordLabel>Token</passwordLabel>
     <signatureLabel></signatureLabel>
     <subjectLabel></subjectLabel>
-    <urlSiteDefault>https://epayment.bbs.no/netaxept.svc?wsdl</urlSiteDefault>
-    <urlApiDefault>https://epayment.bbs.no/terminal/default.aspx</urlApiDefault>
+    <urlSiteDefault>https://epayment.nets.eu/Netaxept/Register.aspx</urlSiteDefault>
+    <urlApiDefault>https://epayment.nets.eu/Terminal/default.aspx</urlApiDefault>
     <urlRecurDefault></urlRecurDefault>
-    <urlSiteTestDefault>https://epayment-test.bbs.no/netaxept.svc?wsdl</urlSiteTestDefault>
-    <urlApiTestDefault>https://epayment-test.bbs.no/terminal/default.aspx</urlApiTestDefault>
+    <urlSiteTestDefault>https://test.epayment.nets.eu/Netaxept/Register.aspx</urlSiteTestDefault>
+    <urlApiTestDefault>https://test.epayment.nets.eu/Terminal/default.aspx</urlApiTestDefault>
     <urlRecurTestDefault></urlRecurTestDefault>
     <urlButtonDefault></urlButtonDefault>
     <urlButtonTestDefault></urlButtonTestDefault>

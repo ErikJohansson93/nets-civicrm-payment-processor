@@ -1,274 +1,365 @@
 <?php
-/**
- * @file
- * Copyright (C) 2007
- * Licensed to CiviCRM under the Academic Free License version 3.0.
- *
- * Written and contributed by Ideal Solution, LLC (http://www.idealso.com)
- */
 
-/**
- *
- * @package CRM
- * @author Marshal Newrock <marshal@idealso.com>
- * $Id: Dummy.php 40328 2012-05-11 23:06:13Z allen $
- */
+require_once 'CRM/Core/Payment.php';
 
-/* NOTE:
- * When looking up response codes in the Authorize.Net API, they
- * begin at one, so always delete one from the "Position in Response"
- */
 class org_dfs_payment_Nets extends CRM_Core_Payment {
-  CONST CHARSET = 'iso-8859-1';
-
-  static protected $_mode = NULL;
-
-  static protected $_params = array();
-
   /**
    * We only need one instance of this object. So we use the singleton
-   * pattern and cache the instance in this variable
+   * pattern and cache the instance in this variable.
    *
    * @var object
    * @static
    */
-  static protected $_singleton = NULL;
+  static private $_singleton = NULL;
+
+  /**
+   * mode of operation: live or test.
+   *
+   * @var object
+   */
+  protected $_mode = NULL;
+
+  /**
+   * URLS used by Nets.
+   */
+  protected $liveprocessurl = '';
+  protected $testprocessurl = '';
+  protected $livequeryurl = '';
+  protected $testqueryurl = '';
+
 
   /**
    * Constructor.
    *
    * @param string $mode
-   *  The mode of operation: live or test.
+   *   The mode of operation: live or test.
    *
    * @return void
    */
-  function __construct($mode, &$paymentProcessor) {
+  function __construct($mode, &$payment_processor) {
+    $this->liveprocessurl = 'https://epayment.nets.eu/Netaxept/Process.aspx';
+    $this->testprocessurl = 'https://test.epayment.nets.eu/Netaxept/Process.aspx';
+    $this->livequeryurl = 'https://epayment.nets.eu/Netaxept/Query.aspx';
+    $this->testqueryurl = 'https://test.epayment.nets.eu/Netaxept/Query.aspx';
+
     $this->_mode = $mode;
-    $this->_paymentProcessor = $paymentProcessor;
+    $this->_paymentProcessor = $payment_processor;
     $this->_processorName = ts('Nets');
   }
 
   /**
    * Singleton function used to manage this object.
    *
-   * @param string $mode the mode of operation: live or test
+   * @param string $mode
+   *   The mode of operation: live or test
    *
    * @return object
+   *   Processor.
    * @static
    */
-  static
-  function &singleton($mode, &$paymentProcessor) {
-    $processorName = $paymentProcessor['name'];
-    if (CRM_Utils_Array::value($processorName, self::$_singleton) === NULL) {
-      self::$_singleton[$processorName] = new org_dfs_payment_Nets($mode, $paymentProcessor);
+  static function &singleton($mode, &$payment_processor, &$payment_form = NULL, $force = FALSE) {
+    $processorName = $payment_processor['name'];
+    if (self::$_singleton[$processorName] === NULL) {
+      self::$_singleton[$processorName] = new org_dfs_payment_Nets($mode, $payment_processor);
     }
     return self::$_singleton[$processorName];
-  }
-
-  /**
-   * Function not implemented.
-   */
-  function doDirectPayment(&$params) {
-    CRM_Core_Error::fatal(ts('This function is not implemented'));
-  }
-
-
-  /**
-   * Submit a payment using notify Method.
-   *
-   * @param array $params assoc array of input parameters for this transaction
-   *
-   * @return array the result in a nice formatted array (or an error object)
-   * @public
-   */
-  function doTransferCheckout($params, $component) {
-    // Include required class files for Nets API.
-    require_once "netsAPI/ClassRegisterRequest.php";
-    require_once "netsAPI/ClassCustomer.php";
-    require_once "netsAPI/ClassTerminal.php";
-    require_once "netsAPI/ClassItem.php";
-    require_once "netsAPI/ClassArrayOfItem.php";
-    require_once "netsAPI/ClassOrder.php";
-    require_once "netsAPI/ClassEnvironment.php";
-
-    // Get whatever we are on a HTTPS or HTTP protocol.
-    if (isset($_SERVER['HTTPS'])) {
-      if ($_SERVER["HTTPS"] == "on") {
-        $protocol = 'https://';
-      }
-      else {
-        $protocol = 'http://';
-      }
-    }
-    else {
-      $protocol = 'http://';
-    }
-
-    // Get the current payment processor.
-    $paymentProcessor = $this->_paymentProcessor;
-
-    // Store some private data that we need when the payment has been made.
-    $qfkey = $params['qfKey'];
-    $private_data = "&contactID={$params['contactID']}&contributionID={$params['contributionID']}&invoiceID={$params['invoiceID']}&membershipID={$params['membershipID']}";
-
-    $values = dfs_civicrm_memberfee_get_membership($params['contactID']);
-
-    // Get membershiptype fees.
-    $membership_fee = dfs_civicrm_memberfee_get_fee($values['membership_type_id']);
-
-    // Set the acceptUrl.
-    if ($component == "contribute") {
-      $returnURL = $protocol . $_SERVER['HTTP_HOST'] . '/civicrm/payment/ipn?processor_name=Nets&module=contribute&qfkey=' . $qfkey . $private_data;
-      if ($this->_mode == 'test') {
-        $returnURL = $returnURL . '&action=preview';
-      }
-    }
-
-    // Get the total amount for the membership. Incl membership fee.
-    $total_amount = $params['amount'] + $membership_fee['remaining_member_fee'];
-
-    $nets_params = array(
-      'amount' => number_format($total_amount, 2, '', ''),
-      'currencyCode' => 'SEK',
-      'merchant' => $paymentProcessor['user_name'],
-      'test' => 1,
-      'language' => 'sv_SE',
-      'orderNumber' => md5(uniqid($params['contributionID'], TRUE)),
-      'os' => NULL,
-      'WebServicePlatform' => 'PHP5',
-      'autoAuth' => NULL,
-      'paymentMethodList' => NULL,
-      'orderDescription' => $params['description'],
-      'redirectOnError' => NULL,
-      'returnURL' => $returnURL,
-      'UpdateStoredPaymentInfo' => NULL,
-    );
-
-    $Environment = new Environment(
-      $nets_params['language'],
-      $nets_params['os'],
-      $nets_params['WebServicePlatform']
-    );
-
-    $Terminal = new Terminal(
-      $nets_params['autoAuth'],
-      $nets_params['paymentMethodList'],
-      $nets_params['language'],
-      $nets_params['orderDescription'],
-      $nets_params['redirectOnError'],
-      $nets_params['returnURL']
-    );
-
-    $Order = new Order(
-      $nets_params['amount'],
-      $nets_params['currencyCode'],
-      $nets_params['force3DSecure'],
-      $nets_params['redirectOnError'],
-      $nets_params['orderNumber'],
-      $nets_params['UpdateStoredPaymentInfo']
-    );
-
-    $Customer = new Customer(
-      $params['street_address-1'],
-      $params['supplemental_address_1-1'],
-      $customerCompanyName,
-      $customerCompanyRegistrationNumber,
-      $customerCountry,
-      $customerNumber,
-      $params['email-5'],
-      $params['first_name'],
-      $params['last_name'],
-      $params['phone-Primary-1'],
-      $params['postal_code-1'],
-      $params['birth_date'],
-      $params['city-1']
-    );
-
-    $register_request = new RegisterRequest(
-      $AvtaleGiro,
-      $CardInfo,
-      $Customer,
-      $description,
-      $DnBNorDirectPayment,
-      $Environment,
-      $MicroPayment,
-      $Order,
-      $Recurring,
-      $serviceType,
-      $Terminal,
-      $transactionId,
-      $transactionReconRef
-    );
-
-    $input_parameters = array(
-      "token" => $paymentProcessor['password'],
-      "merchantId"  => $paymentProcessor['user_name'],
-      "request" => $register_request
-    );
-
-    $wsdl = $paymentProcessor['url_site'];
-    $terminal = $paymentProcessor['url_api'];
-
-    try {
-      if (strpos($_SERVER["HTTP_HOST"], 'uapp') > 0) {
-        // Creating new client having proxy.
-        $client = new SoapClient($wsdl, array('proxy_host' => "isa4", 'proxy_port' => 8080, 'trace' => TRUE, 'exceptions' => TRUE));
-      }
-      else {
-        // Creating new client without proxy.
-        $client = new SoapClient($wsdl, array('trace' => TRUE, 'exceptions' => TRUE));
-      }
-
-      // Do the API call.
-      $output_parameters = $client->__call('Register', array("parameters" => $input_parameters));
-
-      // RegisterResult.
-      $register_result = $output_parameters->RegisterResult;
-
-      $terminal_parameters = "?merchantId=" . $paymentProcessor['user_name'] . "&transactionId=" .  $register_result->TransactionId;
-      CRM_Utils_System::redirect($terminal . $terminal_parameters);
-      exit();
-    }
-    catch (SoapFault $fault) {
-      drupal_set_message(t('An unrecognised error has occured. Please contact an administrator.'), 'error');
-      drupal_goto('civicrm/contribute/transact?reset=1&id=8');
-      watchdog('nets_payment_do_transfer', $fault, array(), WATCHDOG_ERROR, NULL);
-    }
-  }
-
-  /**
-   * This function returns an error if there is any.
-   *
-   * @return
-   *  String the error message if any
-   * @public
-   */
-  function &error($error_code = NULL, $error_message = NULL) {
-    return $e;
   }
 
   /**
    * This function checks to see if we have the right config values.
    *
    * @return string
-   *   the error message if any
+   *   The error message if any.
    * @public
    */
-  function checkConfig() {
-    return NULL;
+  public function checkConfig() {
+    $config = CRM_Core_Config::singleton();
+    $error = array();
+    if (empty($this->_paymentProcessor['user_name'])) {
+      $error[] = ts('Merchant Identifier must not be empty.');
+    }
+    if (empty($this->_paymentProcessor['password'])) {
+      $error[] = ts('Secret Key must not be empty.');
+    }
+    if (!empty($error)) {
+      return implode('<p>', $error);
+    }
+    else {
+      return NULL;
+    }
   }
 
   /**
-   * Handle a notification request from a payment gateway.
-   *
-   * Might be useful to pass in the paymentProcessor object.
-   *
-   * $_GET and $_POST are already available in IPN so no point passing them?
+   * Function not implemented.
    */
-  function handlePaymentNotification() {
-    require_once 'NetsIPN.php';
+  public function doDirectPayment(&$params) {
+    CRM_Core_Error::fatal(ts('This function is not implemented'));
+  }
 
-    $ipn = new org_dfs_payment_NetsIPN();
-    $ipn->main('contribute', $this->_paymentProcessor);
+  /**
+   * Method for getting payment Nets Payment processor.
+   */
+  private function getProcessor($is_test) {
+    $response = civicrm_api3('PaymentProcessor', 'get', array(
+      'sequential' => 1,
+      'is_test' => $is_test,
+      'name' => "Nets",
+    ));
+
+    // Add relevant payment processor information.
+    $processor = $response['values'][0];
+    $processor['query_url'] = $is_test ? $this->testqueryurl : $this->$livequeryurl;
+    $processor['process_url'] = $is_test ? $this->testprocessurl : $this->liveprocessurl;
+
+    return $processor;
+  }
+
+  /**
+   * Build query string.
+   *
+   * @param  array $params
+   * @return string
+   */
+  private function buildQueryString($params) {
+    $query_tring = '?';
+
+    foreach ($params as $name => $value) {
+      $query_tring .= $name . '=' . $value . '&';
+    }
+
+    return rtrim($query_tring, '&');
+  }
+
+  /**
+   * Get protocol for url.
+   *
+   * @return string
+   *   The current protocol.
+   */
+  private function getProtocol() {
+    return (isset($_SERVER['HTTPS']) && $_SERVER["HTTPS"] == "on") ? 'https://' : 'http://';
+  }
+
+  /**
+   * Build return url.
+   */
+  private function getRedirectUrl($params, $component) {
+    $return_url = '';
+
+    if ($component == "contribute") {
+
+      // Build query string.
+      $query_tring = http_build_query(array(
+        'processor_name' => 'Nets',
+        'module' => $component,
+        'qfkey' => $params['qfKey'],
+        'contactID' => $params['contactID'],
+        'contributionID' => $params['contributionID'],
+        'invoiceID' => $params['invoiceID'],
+      ));
+
+      // Set return url.
+      $return_url = $this->getProtocol() . $_SERVER['HTTP_HOST'] . '/civicrm/payment/ipn?' . $query_tring;
+
+      if ($this->_mode == 'test') {
+        $return_url = $return_url . '&action=preview&test=1';
+      }
+    }
+
+    return urlencode($return_url);
+  }
+
+  /**
+   * Register and transaction at Nets and gets the transaction ID.
+   *
+   * @param array $netaxept
+   *   Data used to communicate with netaxept.
+   *
+   * @return Mixed
+   *   Transaction id or FALSE if the registration failed.
+   */
+  private function registerAndGetTransactionId($netaxept) {
+    $url = $this->_paymentProcessor['url_site'] . $this->buildQueryString($netaxept);
+
+    $response = drupal_http_request($url, array('method' => 'POST'));
+
+    if ($response->code == 200 && !empty($response->data)) {
+      $xml = simplexml_load_string($response->data);
+
+      if (!empty($xml->TransactionId)) {
+        $this->transactionId = $xml->TransactionId;
+        return $xml->TransactionId;
+      }
+    }
+
+    return FALSE;
+  }
+
+  /**
+   * Sets appropriate parameters for checking out to UCM Payment Collection.
+   *
+   * @param array $params
+   *   Name value pair of contribution data.
+   *
+   * @param string $component
+   *   The Civicrm that triggered payment.
+   *
+   * @access public
+   */
+  public function doTransferCheckout(&$params, $component) {
+    $component = strtolower($component);
+    $config = CRM_Core_Config::singleton();
+
+    // This payment processor only supports contributions atm.
+    if ($component != 'contribute' && $component != 'event') {
+      CRM_Core_Error::fatal(ts('Component is invalid'));
+    }
+
+    // Important because without storing session objects, civicrm wouldnt know
+    // if the confirm page ever submitted as we are using exit at the end and
+    // and it will never redirect to the thank you page, rather keeps
+    // redirecting to the confirmation page.
+    require_once 'CRM/Core/Session.php';
+    CRM_Core_Session::storeSessionObjects();
+
+    // Set default values for netaxept.
+    $netaxept = array(
+      'amount' => number_format($params['amount'], 2, '', ''),
+      'currencyCode' => 'SEK',
+      'merchantId' => $this->_paymentProcessor['user_name'],
+      'token' => $this->_paymentProcessor['password'],
+      'orderNumber' => $params['contributionID'],
+      'redirectUrl' => $this->getRedirectUrl($params, $component),
+    );
+
+    if ($transaction_id = $this->registerAndGetTransactionId($netaxept)) {
+      $params['trxn_id'] = $transaction_id;
+
+      // Define query parameters.
+      $values = array(
+        'merchantId' => $this->_paymentProcessor['user_name'],
+        'transactionID' => (string) $transaction_id,
+        'redirectUrl' => $netaxept['redirectUrl'],
+      );
+
+      // Build redirect URL.
+      $url = $this->_paymentProcessor['url_api'] . $this->buildQueryString($values);
+
+      // Redirect to payment gateway.
+      CRM_Utils_System::redirect($url);
+
+      return $params;
+    }
+  }
+
+  /**
+   * Handle response from Nets.
+   */
+  public function handlePaymentNotification() {
+    require_once 'CRM/Utils/Array.php';
+
+    // Get values.
+    $module = CRM_Utils_Array::value('module', $_GET);
+    $qf_key = CRM_Utils_Array::value('qfkey', $_GET);
+    $cid = CRM_Utils_Array::value('contributionID', $_GET);
+    $response_code = CRM_Utils_Array::value('responseCode', $_GET);
+    $trxn_id = CRM_Utils_Array::value('transactionId', $_GET);
+
+    // Proceed if everything went fine at Nets.
+    if ($response_code == 'OK') {
+      // Authenticate payment.
+      $auth = $this->processPayment('AUTH');
+
+      // If authenticate was fine, capture amount.
+      if ($auth) {
+        $capture = $this->processPayment('CAPTURE');
+
+        // If capture was fine, proceed to thank you page..
+        if ($capture) {
+          // Finish payment and mark contributions as payed.
+          $this->finishPayment($cid, $trxn_id);
+        }
+      }
+    }
+    else {
+      // Show error if something went wrong.
+      CRM_Core_Error::fatal(ts('Unable to establish connection to the payment gateway.'));
+    }
+
+    // Determine redirect.
+    switch ($module) {
+      case 'contribute':
+        $final_url = CRM_Utils_System::url('civicrm/contribute/transact', "_qf_ThankYou_display=1&qfKey={$qf_key}", FALSE, NULL, FALSE);
+        break;
+
+      case 'event':
+        $final_url = CRM_Utils_System::url('civicrm/event/register', "_qf_Confirm_display=true&qfKey={$qf_key}", FALSE, NULL, FALSE);
+        break;
+
+      default:
+        require_once 'CRM/Core/Error.php';
+        CRM_Core_Error::debug_log_message("Could not get module name from request url");
+        echo "Could not get module name from request url\r\n";
+        break;
+    }
+
+    // Redirect to success page.
+    CRM_Utils_System::redirect($final_url);
+  }
+
+  /**
+   * Method for processing a payment at Nets.
+   */
+  private function processPayment($op) {
+    require_once 'CRM/Utils/Array.php';
+    $is_test = CRM_Utils_Array::value('test', $_GET);
+    $transaction_id = CRM_Utils_Array::value('transactionId', $_GET);
+    $processor = $this->getProcessor($is_test);
+
+    // Define params to be sent.
+    $params = array(
+      'merchantId' => $processor['user_name'],
+      'token' => $processor['password'],
+      'transactionId' => $transaction_id,
+      'operation' => $op,
+    );
+
+    // Try to auth payment.
+    $url = $processor['process_url'] . '?' . http_build_query($params);
+    $response = drupal_http_request($url, array('method' => 'POST'));
+
+    // Parse result.
+    $xml = simplexml_load_string($response->data);
+
+    // Return result.
+    return (string) $xml->ResponseCode == 'OK';
+  }
+
+
+  /**
+   * Method for marking contributions as payed.
+   */
+  private function finishPayment($cid, $trxn_id) {
+    if (!is_numeric($cid)) {
+      require_once 'CRM/Core/Error.php';
+      CRM_Core_Error::debug_log_message("No cid in payment.");
+      echo "Could not finish payment.";
+    }
+
+    // Try to complete transaction.
+    try {
+      // Complete payment.
+      civicrm_api3('Contribution', 'completetransaction', array(
+        'id' => $cid,
+        'trxn_id' => $trxn_id,
+        "is_email_receipt" => 1,
+      ));
+
+      // Send receipt via email.
+
+    }
+    catch (Exception $e) {
+      // DANADA.
+    }
   }
 }
